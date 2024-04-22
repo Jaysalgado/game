@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 339763970
+  GlobalObjectIdHash: 287071508
   InScenePlacedSourceGlobalObjectIdHash: 287071508
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -171,6 +171,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 25
+  colors:
+  - {r: 1, g: 0.047946326, b: 0, a: 0}
+  - {r: 0.14024143, g: 0.08802067, b: 0.8113208, a: 0}
+  - {r: 0.4117424, g: 0.9245283, b: 0.013082923, a: 0}
+  - {r: 0.084905684, g: 0.004405484, b: 0.004405484, a: 0}
+  - {r: 0.9339623, g: 0.066082224, b: 0.8327269, a: 0}
+  - {r: 0.038848326, g: 0.9150943, b: 0.7153243, a: 0}
+  - {r: 0.990566, g: 0.990566, b: 0.990566, a: 0}
+  - {r: 1, g: 0.6060061, b: 0, a: 0}
 --- !u!114 &174078615848227057
 MonoBehaviour:
   m_ObjectHideFlags: 0

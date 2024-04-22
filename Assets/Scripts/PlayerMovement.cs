@@ -1,19 +1,17 @@
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections;
+using System.Collections.Generic;
 
 public class PlayerMovement : NetworkBehaviour
 {
     [SerializeField] private float speed = 25f;
     private Rigidbody rb;
-    private MeshRenderer meshRenderer; // Reference to the Mesh Renderer
+    private MeshRenderer meshRenderer; // Reference to the Mesh Renderer 
+    [SerializeField] List<Color> colors = new List<Color>();
+     public SpawnManager.PlayerRole PlayerRole { get; private set; }
 
-    // Network variables for color synchronization
-    private NetworkVariable<float> colorR = new NetworkVariable<float>();
-    private NetworkVariable<float> colorG = new NetworkVariable<float>();
-    private NetworkVariable<float> colorB = new NetworkVariable<float>();
-
-    void Start()
+    void Awake()
     {
         rb = GetComponent<Rigidbody>();
         meshRenderer = GetComponent<MeshRenderer>(); 
@@ -31,26 +29,7 @@ public class PlayerMovement : NetworkBehaviour
             Debug.Log("Local player spawned");
             StartCoroutine(WaitForSpawnManager());
         }
-
-        // Subscribe to color changes
-        colorR.OnValueChanged += OnColorChanged;
-        colorG.OnValueChanged += OnColorChanged;
-        colorB.OnValueChanged += OnColorChanged;
-
-        // Initial application of color
-        ApplyColor(new Color(colorR.Value, colorG.Value, colorB.Value));
-    }
-
-    new void OnDestroy()
-    {
-        colorR.OnValueChanged -= OnColorChanged;
-        colorG.OnValueChanged -= OnColorChanged;
-        colorB.OnValueChanged -= OnColorChanged;
-    }
-
-    private void OnColorChanged(float oldVal, float newVal)
-    {
-        ApplyColor(new Color(colorR.Value, colorG.Value, colorB.Value));
+         meshRenderer.material.color = colors[(int)OwnerClientId];
     }
 
     private IEnumerator WaitForSpawnManager()
@@ -81,42 +60,61 @@ public class PlayerMovement : NetworkBehaviour
         transform.position = position;  // Set the spawn position
         if (meshRenderer != null)
         {
-            Color newColor;
             if (assignedRole == SpawnManager.PlayerRole.Enemy)
             {
-                 Debug.Log("Spawned as the Enemy");
-                newColor = Color.red; // Enemy color
+                Debug.Log("Spawned as the Enemy");
             }
             else
             {
                 Debug.Log("Spawned as a Normal Player");
-                newColor = Random.ColorHSV(); // Assign a random color
             }
-            // Request server to set and synchronize color
-            RequestColorChangeServerRpc(newColor.r, newColor.g, newColor.b);
         }
     }
+
+    void OnCollisionEnter(Collision col)
+    {
+        if (IsClient && IsOwner)
+        {
+            // Correctly accessing the PlayerMovement component from the collision object
+            PlayerMovement otherPlayer = col.GetComponent<Collider>().GetComponent<PlayerMovement>();
+            if (otherPlayer != null && this.PlayerRole == SpawnManager.PlayerRole.Enemy && otherPlayer.PlayerRole == SpawnManager.PlayerRole.Normal)
+            {
+                Debug.Log($"Player {OwnerClientId} with role {PlayerRole} collided with player {otherPlayer.OwnerClientId} with role {otherPlayer.PlayerRole}");
+                RequestVerifyCollisionServerRpc(otherPlayer.GetComponent<NetworkObject>().NetworkObjectId);
+            }
+        }
+    }
+
 
     [ServerRpc]
-    private void RequestColorChangeServerRpc(float r, float g, float b)
+    void RequestVerifyCollisionServerRpc(ulong otherPlayerId, ServerRpcParams rpcParams = default)
     {
-        // Set color on server and propagate to all clients
-        SetColor(new Color(r, g, b));
+        // This function will actually run on the server
+        HandleCollision(otherPlayerId);
     }
 
-    private void SetColor(Color color)
+    private void HandleCollision(ulong otherPlayerId)
     {
-        // Server updates the network variables which trigger color changes on all clients
-        colorR.Value = color.r;
-        colorG.Value = color.g;
-        colorB.Value = color.b;
-    }
-
-    private void ApplyColor(Color color)
-    {
-        if (meshRenderer != null)
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(otherPlayerId, out NetworkObject otherPlayerNetworkObject))
         {
-            meshRenderer.material.color = color;  // Apply the color locally
+            PlayerMovement otherPlayer = otherPlayerNetworkObject.GetComponent<PlayerMovement>();
+            if (otherPlayer != null)
+            {
+                // Further validation could be done here to make sure the collision is valid
+                DestroyPlayerNetworked(otherPlayer.gameObject);
+            }
+        }
+        else
+        {
+            Debug.LogError("Failed to find the network object for player ID: " + otherPlayerId);
         }
     }
+
+    private void DestroyPlayerNetworked(GameObject player)
+    {
+        // Assuming proper authority checks are in place
+        player.GetComponent<NetworkObject>().Despawn();
+        Destroy(player);
+    }
+
 }
