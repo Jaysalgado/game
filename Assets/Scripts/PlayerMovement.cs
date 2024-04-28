@@ -5,11 +5,18 @@ using System.Collections.Generic;
 
 public class PlayerMovement : NetworkBehaviour
 {
+     public static PlayerMovement LocalPlayerInstance { get; private set; }
     [SerializeField] private float speed = 25f;
     private Rigidbody rb;
     private MeshRenderer meshRenderer; // Reference to the Mesh Renderer 
-    [SerializeField] List<Color> colors = new List<Color>();
-     public SpawnManager.PlayerRole PlayerRole { get; private set; }
+    [SerializeField] private List<Color> colors = new();
+    [SerializeField] public NetworkVariable<SpawnManager.PlayerRole> playerRole = new NetworkVariable<SpawnManager.PlayerRole>();
+
+    public SpawnManager.PlayerRole PlayerRole
+    {
+        get { return playerRole.Value; }
+        private set { playerRole.Value = value; }
+    }
 
     void Awake()
     {
@@ -26,6 +33,7 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (IsOwner)
         {
+            LocalPlayerInstance = this;
             Debug.Log("Local player spawned");
             StartCoroutine(WaitForSpawnManager());
         }
@@ -39,7 +47,6 @@ public class PlayerMovement : NetworkBehaviour
             Debug.Log("Waiting for spawn manager...");
             yield return null; // Wait for the next frame
         }
-
         Debug.Log("Requesting Spawn Point from Server RPC");
         SpawnManager.Instance.RequestSpawnPointServerRpc();
     }
@@ -47,16 +54,19 @@ public class PlayerMovement : NetworkBehaviour
     void FixedUpdate()
     {
         if (!IsOwner) return; // Only process input for the owner of this player object
-
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
-        Vector3 movement = new Vector3(-vertical, 0, horizontal);
-        rb.AddForce(movement * speed);
+        if (!GameManager.Instance.gameStarted.Value) return;
+        
+            float horizontal = Input.GetAxis("Horizontal");
+            float vertical = Input.GetAxis("Vertical");
+            Vector3 movement = new(-vertical, 0, horizontal);
+            rb.AddForce(movement * speed);
+        
     }
 
     // Called when the spawn position and role are determined
     public void SetInitialPositionAndRole(Vector3 position, SpawnManager.PlayerRole assignedRole)
     {
+        playerRole.Value = assignedRole; // Set the player role
         transform.position = position;  // Set the spawn position
         if (meshRenderer != null)
         {
@@ -70,51 +80,4 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
     }
-
-    // void OnCollisionEnter(Collision col)
-    // {
-    //     if (IsClient && IsOwner)
-    //     {
-    //         // Correctly accessing the PlayerMovement component from the collision object
-    //         PlayerMovement otherPlayer = col.GetComponent<Collider>().GetComponent<PlayerMovement>();
-    //         if (otherPlayer != null && this.PlayerRole == SpawnManager.PlayerRole.Enemy && otherPlayer.PlayerRole == SpawnManager.PlayerRole.Normal)
-    //         {
-    //             Debug.Log($"Player {OwnerClientId} with role {PlayerRole} collided with player {otherPlayer.OwnerClientId} with role {otherPlayer.PlayerRole}");
-    //             RequestVerifyCollisionServerRpc(otherPlayer.GetComponent<NetworkObject>().NetworkObjectId);
-    //         }
-    //     }
-    // }
-
-
-    // [ServerRpc]
-    // void RequestVerifyCollisionServerRpc(ulong otherPlayerId, ServerRpcParams rpcParams = default)
-    // {
-    //     // This function will actually run on the server
-    //     HandleCollision(otherPlayerId);
-    // }
-
-    // private void HandleCollision(ulong otherPlayerId)
-    // {
-    //     if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(otherPlayerId, out NetworkObject otherPlayerNetworkObject))
-    //     {
-    //         PlayerMovement otherPlayer = otherPlayerNetworkObject.GetComponent<PlayerMovement>();
-    //         if (otherPlayer != null)
-    //         {
-    //             // Further validation could be done here to make sure the collision is valid
-    //             DestroyPlayerNetworked(otherPlayer.gameObject);
-    //         }
-    //     }
-    //     else
-    //     {
-    //         Debug.LogError("Failed to find the network object for player ID: " + otherPlayerId);
-    //     }
-    // }
-
-    // private void DestroyPlayerNetworked(GameObject player)
-    // {
-    //     // Assuming proper authority checks are in place
-    //     player.GetComponent<NetworkObject>().Despawn();
-    //     Destroy(player);
-    // }
-
 }

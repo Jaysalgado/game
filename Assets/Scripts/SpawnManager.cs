@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -12,6 +13,9 @@ public class SpawnManager : NetworkBehaviour {
 
     // Network synchronized IsReady property
     private NetworkVariable<bool> isReady = new NetworkVariable<bool>();
+
+    // Event to notify when roles are assigned
+    public static event Action<PlayerRole, ulong> OnRoleAssigned;
 
      public bool IsReady {
         get { return isReady.Value; } // Public getter to access the private NetworkVariable
@@ -70,12 +74,14 @@ public class SpawnManager : NetworkBehaviour {
 [ClientRpc]
 private void UpdateClientWithSpawnPointClientRpc(Vector3 spawnPosition, SpawnManager.PlayerRole role, ulong clientId, ClientRpcParams rpcParams = default) {
     // This check ensures the RPC only affects the intended client
+    //   Debug.Log($"client {NetworkManager.Singleton.LocalClientId}");
     if (NetworkManager.Singleton.LocalClientId == clientId) {
-
         // on the correct client and their player GameObject.
         PlayerMovement playerMovement = FindObjectOfType<PlayerMovement>();
         if (playerMovement != null) {
             playerMovement.SetInitialPositionAndRole(spawnPosition, role);
+            OnRoleAssigned?.Invoke(role, clientId);
+
         } else {
             Debug.LogError("PlayerMovement component not found on any GameObject. Ensure this RPC is being called on the player's GameObject.");
         }
